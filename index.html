@@ -66,9 +66,38 @@ textarea{width:100%;min-height:64px;font:inherit;color:inherit;background:var(--
 .wd{display:grid;gap:4px;justify-items:center;padding:8px 2px;border-radius:8px;border:1px solid transparent;background:none;cursor:pointer}
 .wd.sel{border-color:var(--accent)}
 .wd span{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-.ring{width:34px;height:34px}
+.ring{width:34px;height:34px;display:block}
+.ring svg{width:100%;height:100%;display:block}
 .wd .b{font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:420px){.stats{grid-template-columns:repeat(2,1fr)}}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
+.seg button{border:0;background:none;padding:8px;font-weight:600;color:var(--muted);border-radius:7px}
+.seg button[aria-selected="true"]{background:var(--accent-soft);color:var(--accent)}
+.navmid{display:grid;justify-items:center;gap:2px;text-align:center;min-width:0}
+.daynav button:disabled{opacity:.35;cursor:default}
+.wrow{display:grid;grid-template-columns:64px 34px 1fr auto;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--line);cursor:pointer}
+.wrow:first-child{border-top:0}
+.wrow.future{opacity:.45;cursor:default}
+.wrow .dname{font:600 1rem var(--display);font-variant-numeric:tabular-nums}
+.wrow .dname small{display:block;font:400 .78rem var(--body);color:var(--muted)}
+.pips{display:flex;flex-wrap:wrap;gap:5px;min-width:0}
+.pip{font-size:.72rem;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.pip.on{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+.wbeer{font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.wbeer.over{color:var(--warn)}
+.cal{padding:10px}
+.calhead,.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.calhead span{text-align:center;font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding-bottom:4px}
+.cd{position:relative;display:grid;place-items:center;aspect-ratio:1;max-width:100%;border:1px solid transparent;background:none;padding:0;border-radius:8px;min-width:0}
+.cd.today{border-color:var(--accent)}
+.cd.out{visibility:hidden}
+.cd.future{opacity:.4;cursor:default}
+.cd svg{width:82%;height:82%;position:absolute;inset:9%}
+.cd .num{font-size:.8rem;font-variant-numeric:tabular-nums;position:relative}
+.cd .bc{position:absolute;right:2px;top:1px;font-size:.62rem;font-weight:700;color:var(--muted)}
+.cd .bc.over{color:var(--warn)}
+.legend{font-size:.8rem;margin:0}
 .stat{padding:12px}
 .stat .n{font:700 1.7rem var(--display);font-variant-numeric:tabular-nums;line-height:1.1}
 .stat .l{font-size:.8rem;color:var(--muted)}
@@ -103,15 +132,23 @@ textarea{width:100%;min-height:64px;font:inherit;color:inherit;background:var(--
   </section>
 
   <section>
-    <div class="daynav">
-      <button id="prevDay" aria-label="Previous day">‹</button>
-      <h2 id="dayTitle">Today</h2>
-      <button id="nextDay" aria-label="Next day">›</button>
+    <div class="seg" role="tablist" aria-label="View">
+      <button role="tab" data-view="day">Day</button>
+      <button role="tab" data-view="week">Week</button>
+      <button role="tab" data-view="month">Month</button>
     </div>
+    <div class="daynav">
+      <button id="prevDay" aria-label="Previous">‹</button>
+      <div class="navmid"><h2 id="dayTitle">Today</h2><button class="link" id="todayBtn" hidden>Back to today</button></div>
+      <button id="nextDay" aria-label="Next">›</button>
+    </div>
+  </section>
+
+  <section id="viewDay">
     <ul class="list card" id="checklist"></ul>
   </section>
 
-  <section>
+  <section id="viewDayBeer">
     <h2>Beer</h2>
     <div class="card beer">
       <div class="counter">
@@ -125,14 +162,30 @@ textarea{width:100%;min-height:64px;font:inherit;color:inherit;background:var(--
     <textarea id="note" placeholder="Optional"></textarea>
   </section>
 
-  <section>
-    <h2>This week</h2>
-    <div class="week" id="week"></div>
+  <section id="viewStats">
+    <h2 id="statsTitle">This week</h2>
     <div class="stats">
-      <div class="card stat"><div class="n" id="stWalks">0/7</div><div class="l">Walks</div></div>
-      <div class="card stat"><div class="n" id="stBeers">0</div><div class="l">Beers (cap 6)</div></div>
+      <div class="card stat"><div class="n" id="stDone">0%</div><div class="l">Routine done</div></div>
+      <div class="card stat"><div class="n" id="stWalks">0</div><div class="l">Walk days</div></div>
+      <div class="card stat"><div class="n" id="stBeers">0</div><div class="l" id="stBeersL">Beers (cap 6)</div></div>
       <div class="card stat"><div class="n" id="stAF">0</div><div class="l">Alcohol-free days</div></div>
     </div>
+  </section>
+
+  <section id="viewWeekStrip">
+    <div class="week" id="week"></div>
+  </section>
+
+  <section id="viewWeekList">
+    <ul class="list card" id="weekList"></ul>
+  </section>
+
+  <section id="viewMonth">
+    <div class="card cal">
+      <div class="calhead" id="calHead"></div>
+      <div class="calgrid" id="calGrid"></div>
+    </div>
+    <p class="muted legend">Ring shows how much of the routine you did. A number is beers that day.</p>
   </section>
 
   <section>
@@ -178,11 +231,72 @@ function score(s){const its=itemsFor(s),d=day(s);return its.length?its.filter(i=
 
 function setSync(state,text){const dot=document.getElementById("syncDot");dot.className="dot "+(state||"");document.getElementById("syncText").textContent=text}
 
+let view = LS.get("view")||"day";
+const SHORT={coffee:"Coffee",stretch:"Stretch",lift:"Lift",rope:"Rope",breakfast:"Bkfst",walk:"Walk"};
+function mondayOf(s){return addDays(s,-((parse(s).getDay()+6)%7))}
+function monthStart(s){return s.slice(0,8)+"01"}
+function addMonths(s,n){const d=parse(monthStart(s));d.setMonth(d.getMonth()+n);return iso(d)}
+function ringSVG(sc,r,w){const C=2*Math.PI*r,c=r+w/2,size=2*c;return '<svg viewBox="0 0 '+size+' '+size+'" aria-hidden="true"><circle cx="'+c+'" cy="'+c+'" r="'+r+'" fill="none" stroke="var(--line)" stroke-width="'+w+'"/>'+(sc>0?'<circle cx="'+c+'" cy="'+c+'" r="'+r+'" fill="none" stroke="var(--accent)" stroke-width="'+w+'" stroke-linecap="round" transform="rotate(-90 '+c+' '+c+')" stroke-dasharray="'+(C*sc)+' '+C+'"/>':'')+'</svg>'}
+function rangeStats(from,to,today){
+  let poss=0,done=0,walks=0,beers=0,af=0,days=0;
+  for(let s=from;s<=to&&s<=today;s=addDays(s,1)){
+    const its=itemsFor(s),d=day(s); days++;
+    poss+=its.length; done+=its.filter(i=>d[i.k]).length;
+    if(d.walk) walks++; beers+=d.beers||0; if(!(d.beers>0)) af++;
+  }
+  return {pct:poss?Math.round(100*done/poss):0,walks,beers,af,days};
+}
+function show(id,on){document.getElementById(id).hidden=!on}
+function setView(v){view=v;LS.set("view",v);render();window.scrollTo(0,0)}
+function openDay(s){sel=s;setView("day")}
+
 function render(){
   const today=iso(new Date());
+  if(sel>today) sel=today;
   document.getElementById("todayLabel").textContent=parse(today).toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
-  document.getElementById("dayTitle").textContent= sel===today?"Today":parse(sel).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});
-  document.getElementById("nextDay").disabled = sel>=today;
+  document.querySelectorAll(".seg button").forEach(b=>b.setAttribute("aria-selected",b.dataset.view===view));
+  show("viewDay",view==="day"); show("viewDayBeer",view==="day"); show("viewWeekStrip",view==="day");
+  show("viewWeekList",view==="week"); show("viewMonth",view==="month");
+
+  const title=document.getElementById("dayTitle"), next=document.getElementById("nextDay"), tbtn=document.getElementById("todayBtn");
+  let from,to,atToday;
+  if(view==="day"){
+    title.textContent= sel===today?"Today":parse(sel).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});
+    atToday = sel===today; from=mondayOf(sel); to=addDays(from,6);
+  } else if(view==="week"){
+    from=mondayOf(sel); to=addDays(from,6); atToday = from===mondayOf(today);
+    const f=parse(from),t=parse(to);
+    title.textContent = atToday?"This week": f.toLocaleDateString(undefined,{month:"short",day:"numeric"})+" – "+t.toLocaleDateString(undefined,f.getMonth()===t.getMonth()?{day:"numeric"}:{month:"short",day:"numeric"});
+  } else {
+    from=monthStart(sel); to=addDays(addMonths(sel,1),-1); atToday = from===monthStart(today);
+    title.textContent = parse(from).toLocaleDateString(undefined,{month:"long",year:"numeric"});
+  }
+  next.disabled = atToday; tbtn.hidden = atToday;
+
+  // stats for the period (day view shows its week)
+  const st=rangeStats(from,to,today);
+  document.getElementById("statsTitle").textContent = view==="month"?"This month":(view==="week"&&!atToday?"That week":"This week");
+  document.getElementById("stDone").textContent=st.pct+"%";
+  document.getElementById("stWalks").textContent=st.walks+"/"+st.days;
+  const sb=document.getElementById("stBeers"), weeks=Math.max(1,st.days/7);
+  if(view==="month"){ sb.textContent=st.beers; document.getElementById("stBeersL").textContent=(st.beers/weeks).toFixed(1)+" a week avg"; sb.style.color=st.beers/weeks>6?"var(--warn)":""; }
+  else { sb.textContent=st.beers; document.getElementById("stBeersL").textContent="Beers (cap 6)"; sb.style.color=st.beers>6?"var(--warn)":""; }
+  document.getElementById("stAF").textContent=st.af;
+
+  if(view==="day") renderDay(today);
+  if(view==="day") renderStrip(from,today);
+  if(view==="week") renderWeekList(from,today);
+  if(view==="month") renderMonth(from,today);
+
+  let sk=0, s=day(today).stretch?today:addDays(today,-1);
+  while(day(s).stretch){sk++; s=addDays(s,-1)}
+  document.getElementById("streak").textContent=sk+"-day";
+  const tw=weekNo(today);
+  document.getElementById("phase").textContent = today<START ? "Plan starts Wednesday, Oct 28." :
+    "Week "+Math.min(tw,4)+(tw>4?"+":"")+" of the plan: walks "+walkMins(tw)+" min, jump rope "+ropeText(tw)+".";
+}
+
+function renderDay(today){
   const w=weekNo(sel), d=day(sel);
   const ul=document.getElementById("checklist"); ul.innerHTML="";
   itemsFor(sel).forEach(i=>{
@@ -197,33 +311,57 @@ function render(){
   const b=d.beers||0; document.getElementById("beerCount").textContent=b;
   const tag=document.getElementById("beerTag"); tag.textContent=b===0?"Alcohol-free":b<=2?"Within plan":"Over 2"; tag.className="tag"+(b>2?" over":"");
   const note=document.getElementById("note"); if(document.activeElement!==note) note.value=d.note||"";
+}
 
-  // week (Mon-Sun containing sel)
-  const wd=(parse(sel).getDay()+6)%7, mon=addDays(sel,-wd);
+function renderStrip(mon,today){
   const wk=document.getElementById("week"); wk.innerHTML="";
-  let walks=0,beers=0,af=0;
   for(let k=0;k<7;k++){
-    const s=addDays(mon,k), dd=day(s), sc=score(s), past=s<=today;
-    if(dd.walk) walks++; beers+=dd.beers||0; if(past && (dd.beers||0)===0) af++;
-    const btn=document.createElement("button"); btn.className="wd"+(s===sel?" sel":""); btn.setAttribute("aria-label",s);
-    const C=2*Math.PI*14;
-    btn.innerHTML='<span></span><svg class="ring" viewBox="0 0 34 34"><circle cx="17" cy="17" r="14" fill="none" stroke="var(--line)" stroke-width="4"/>'+(sc>0?'<circle cx="17" cy="17" r="14" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" transform="rotate(-90 17 17)" stroke-dasharray="'+(C*sc)+' '+C+'"/>':'')+'</svg><span class="b"></span>';
+    const s=addDays(mon,k), dd=day(s), past=s<=today;
+    const btn=document.createElement("button"); btn.className="wd"+(s===sel?" sel":""); btn.disabled=!past;
+    btn.setAttribute("aria-label",parse(s).toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}));
+    btn.innerHTML='<span></span><span class="ring">'+ringSVG(score(s),14,4)+'</span><span class="b"></span>';
     btn.querySelector("span").textContent=parse(s).toLocaleDateString(undefined,{weekday:"narrow"});
     btn.querySelector(".b").textContent=past?(dd.beers?dd.beers+" beer"+(dd.beers>1?"s":""):"AF"):"";
     btn.onclick=()=>{sel=s;render()};
     wk.appendChild(btn);
   }
-  document.getElementById("stWalks").textContent=walks+"/7";
-  const sb=document.getElementById("stBeers"); sb.textContent=beers; sb.style.color=beers>6?"var(--warn)":"";
-  document.getElementById("stAF").textContent=af;
+}
 
-  // streak: consecutive days (ending today or yesterday) with stretch done
-  let st=0, s=day(today).stretch?today:addDays(today,-1);
-  while(day(s).stretch){st++; s=addDays(s,-1)}
-  document.getElementById("streak").textContent=st+"-day";
-  const tw=weekNo(today);
-  document.getElementById("phase").textContent = today<START ? "Plan starts Wednesday, Oct 28." :
-    "Week "+Math.min(tw,4)+(tw>4?"+":"")+" of the plan: walks "+walkMins(tw)+" min, jump rope "+ropeText(tw)+".";
+function renderWeekList(mon,today){
+  const ul=document.getElementById("weekList"); ul.innerHTML="";
+  for(let k=0;k<7;k++){
+    const s=addDays(mon,k), d=day(s), past=s<=today, D=parse(s);
+    const li=document.createElement("li"); li.className="wrow"+(past?"":" future");
+    li.innerHTML='<span class="dname"></span><span class="ring">'+ringSVG(past?score(s):0,14,4)+'</span><span class="pips"></span><span class="wbeer"></span>';
+    li.querySelector(".dname").innerHTML=''; li.querySelector(".dname").append(D.toLocaleDateString(undefined,{weekday:"short"}));
+    const sm=document.createElement("small"); sm.textContent=D.toLocaleDateString(undefined,{month:"short",day:"numeric"}); li.querySelector(".dname").appendChild(sm);
+    const pips=li.querySelector(".pips");
+    itemsFor(s).forEach(i=>{const p=document.createElement("span"); p.className="pip"+(d[i.k]?" on":""); p.textContent=SHORT[i.k]; pips.appendChild(p)});
+    const wb=li.querySelector(".wbeer"); wb.textContent=past?((d.beers||0)?d.beers+" beer"+((d.beers>1)?"s":""):"AF"):"";
+    if((d.beers||0)>2) wb.classList.add("over");
+    if(past){li.tabIndex=0; li.onclick=()=>openDay(s); li.onkeydown=e=>{if(e.key==="Enter"){openDay(s)}}}
+    ul.appendChild(li);
+  }
+}
+
+function renderMonth(first,today){
+  const head=document.getElementById("calHead"); head.innerHTML="";
+  const mon=mondayOf(first);
+  for(let k=0;k<7;k++){const sp=document.createElement("span"); sp.textContent=parse(addDays(mon,k)).toLocaleDateString(undefined,{weekday:"narrow"}); head.appendChild(sp)}
+  const grid=document.getElementById("calGrid"); grid.innerHTML="";
+  const m=first.slice(0,7); let s=mon;
+  const last=addDays(addMonths(first,1),-1), end=addDays(mondayOf(last),6);
+  for(;s<=end;s=addDays(s,1)){
+    const b=document.createElement("button"), inM=s.slice(0,7)===m, past=s<=today, d=day(s);
+    b.className="cd"+(inM?"":" out")+(s===today?" today":"")+(past?"":" future");
+    b.disabled=!past||!inM;
+    b.setAttribute("aria-label",parse(s).toLocaleDateString(undefined,{month:"long",day:"numeric"}));
+    b.innerHTML=ringSVG(past?score(s):0,14,4)+'<span class="num"></span>'+((d.beers||0)>0?'<span class="bc"></span>':'');
+    b.querySelector(".num").textContent=Number(s.slice(8));
+    if(d.beers>0){const bc=b.querySelector(".bc"); bc.textContent=d.beers; if(d.beers>2) bc.classList.add("over");}
+    b.onclick=()=>openDay(s);
+    grid.appendChild(b);
+  }
 }
 
 function edit(s,patch){
@@ -269,8 +407,11 @@ async function save(){
   saving=false;
 }
 
-document.getElementById("prevDay").onclick=()=>{sel=addDays(sel,-1);render()};
-document.getElementById("nextDay").onclick=()=>{const t=iso(new Date()); if(sel<t){sel=addDays(sel,1);render()}};
+function step(n){const t=iso(new Date()); if(view==="day") sel=addDays(sel,n); else if(view==="week") sel=addDays(mondayOf(sel),7*n); else sel=addMonths(sel,n); if(sel>t) sel=t; render()}
+document.getElementById("prevDay").onclick=()=>step(-1);
+document.getElementById("nextDay").onclick=()=>step(1);
+document.getElementById("todayBtn").onclick=()=>{sel=iso(new Date());render()};
+document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>setView(b.dataset.view));
 document.getElementById("beerPlus").onclick=()=>edit(sel,{beers:(day(sel).beers||0)+1});
 document.getElementById("beerMinus").onclick=()=>edit(sel,{beers:Math.max(0,(day(sel).beers||0)-1)});
 let noteTimer; document.getElementById("note").oninput=e=>{clearTimeout(noteTimer); const v=e.target.value; noteTimer=setTimeout(()=>edit(sel,{note:v}),800)};

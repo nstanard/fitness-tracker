@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mornings">
+<meta name="theme-color" content="#f3f5f2">
+<title>Morning Routine Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: one narrow column built like a training card: today's checklist, beer counter, week grid, progress. */
+:root{
+  --bg:#f3f5f2; --surface:#ffffff; --line:#d9dfd8; --fg:#1d2420; --muted:#5f6b63;
+  --accent:#2f6b4f; --accent-soft:#dcebe2; --warn:#a4561d; --warn-soft:#f6e6d8;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#141917; --surface:#1d2420; --line:#2e3833; --fg:#e7ece8; --muted:#9aa79f;
+  --accent:#6fbf96; --accent-soft:#22382d; --warn:#e3a06a; --warn-soft:#3a2a1d; color-scheme:dark;
+}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:16px/1.45 var(--body);
+  padding:env(safe-area-inset-top,0px) max(16px,env(safe-area-inset-right,0px)) calc(32px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+main{max-width:560px;margin:0 auto;display:grid;gap:20px;padding-top:20px}
+h1,h2{font-family:var(--display);font-weight:700;letter-spacing:.01em;margin:0;text-wrap:balance}
+h1{font-size:2rem;line-height:1}
+h2{font-size:1.15rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+.date{color:var(--muted);font-size:.95rem}
+.sync{font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:var(--accent)} .dot.bad{background:var(--warn)}
+section{display:grid;gap:10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.daynav{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.daynav button{font:600 1rem var(--body)}
+button{font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.list{list-style:none;margin:0;padding:0}
+.item{display:grid;grid-template-columns:56px 1fr auto;align-items:center;gap:12px;padding:14px 14px;border-top:1px solid var(--line);cursor:pointer;user-select:none}
+.item:first-child{border-top:0}
+.time{font:600 1rem var(--display);color:var(--muted);font-variant-numeric:tabular-nums}
+.what{min-width:0}
+.what b{display:block;font-weight:600}
+.what small{color:var(--muted);display:block}
+.check{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;transition:background .15s,border-color .15s}
+.item.done .check{background:var(--accent);border-color:var(--accent)}
+.item.done .check::after{content:"";width:9px;height:15px;border:solid var(--bg);border-width:0 3px 3px 0;transform:rotate(45deg) translate(-1px,-2px)}
+.item.done b{color:var(--muted);text-decoration:line-through;text-decoration-thickness:1px}
+.beer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px}
+.counter{display:flex;align-items:center;gap:14px}
+.counter button{width:44px;height:44px;font-size:1.4rem;padding:0;border-radius:50%}
+.count{font:700 2rem var(--display);min-width:2ch;text-align:center;font-variant-numeric:tabular-nums}
+.tag{font-size:.8rem;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.tag.over{background:var(--warn-soft);color:var(--warn)}
+textarea{width:100%;min-height:64px;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;resize:vertical}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.wd{display:grid;gap:4px;justify-items:center;padding:8px 2px;border-radius:8px;border:1px solid transparent;background:none;cursor:pointer}
+.wd.sel{border-color:var(--accent)}
+.wd span{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.ring{width:34px;height:34px}
+.wd .b{font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{padding:12px}
+.stat .n{font:700 1.7rem var(--display);font-variant-numeric:tabular-nums;line-height:1.1}
+.stat .l{font-size:.8rem;color:var(--muted)}
+.prog{padding:14px;display:grid;gap:6px}
+.prog p{margin:0}
+.muted{color:var(--muted)}
+.setup{padding:16px;display:grid;gap:10px}
+.setup label{display:grid;gap:4px;font-size:.9rem;font-weight:500}
+.setup input{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px}
+.primary{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:600}
+.err{color:var(--warn);font-size:.9rem;margin:0}
+.foot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.link{background:none;border:0;padding:0;color:var(--muted);text-decoration:underline;font-size:.85rem}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div><h1>Mornings</h1><div class="date" id="todayLabel"></div></div>
+    <div class="sync"><span class="dot" id="syncDot"></span><span id="syncText">Not connected</span></div>
+  </header>
+
+  <section id="setup" class="card setup" hidden>
+    <h2>Connect your GitHub log</h2>
+    <p class="muted" style="margin:0">Your log saves to a private repo. The token stays on this phone only.</p>
+    <label for="cfgOwner">GitHub username<input id="cfgOwner" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    <label for="cfgRepo">Private log repo<input id="cfgRepo" value="fitness-log" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    <label for="cfgToken">Access token<input id="cfgToken" type="password" autocomplete="off" placeholder="github_pat_…"></label>
+    <p class="err" id="setupErr" hidden></p>
+    <button class="primary" id="connectBtn">Connect</button>
+  </section>
+
+  <section>
+    <div class="daynav">
+      <button id="prevDay" aria-label="Previous day">‹</button>
+      <h2 id="dayTitle">Today</h2>
+      <button id="nextDay" aria-label="Next day">›</button>
+    </div>
+    <ul class="list card" id="checklist"></ul>
+  </section>
+
+  <section>
+    <h2>Beer</h2>
+    <div class="card beer">
+      <div class="counter">
+        <button id="beerMinus" aria-label="One fewer beer">−</button>
+        <div class="count" id="beerCount">0</div>
+        <button id="beerPlus" aria-label="One more beer">+</button>
+      </div>
+      <span class="tag" id="beerTag">Alcohol-free</span>
+    </div>
+    <label for="note" class="muted" style="font-size:.9rem">Note (how you felt, sleep, energy)</label>
+    <textarea id="note" placeholder="Optional"></textarea>
+  </section>
+
+  <section>
+    <h2>This week</h2>
+    <div class="week" id="week"></div>
+    <div class="stats">
+      <div class="card stat"><div class="n" id="stWalks">0/7</div><div class="l">Walks</div></div>
+      <div class="card stat"><div class="n" id="stBeers">0</div><div class="l">Beers (cap 6)</div></div>
+      <div class="card stat"><div class="n" id="stAF">0</div><div class="l">Alcohol-free days</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Progress</h2>
+    <div class="card prog">
+      <p><b id="streak">0-day</b> morning streak</p>
+      <p class="muted" id="phase"></p>
+    </div>
+  </section>
+
+  <div class="foot">
+    <button class="link" id="settingsBtn">Connection settings</button>
+    <button class="link" id="syncBtn">Sync now</button>
+  </div>
+</main>
+
+<script>
+const START = "2026-10-28";
+const ITEMS = [
+  {k:"coffee", t:"5:40", n:"Coffee", d:"First cup, half a banana if hungry", days:[0,1,2,3,4,5,6]},
+  {k:"stretch", t:"6:00", n:"Stretch", d:"10 min", days:[0,1,2,3,4,5,6]},
+  {k:"lift", t:"6:15", n:"Dumbbells", d:"Squat, row, press, RDL, overhead", days:[2,4]},
+  {k:"rope", t:"6:15", n:"Jump rope or bike", d:"", days:[1,3,5]},
+  {k:"breakfast", t:"6:45", n:"Breakfast", d:"Oatmeal, banana, protein", days:[0,1,2,3,4,5,6]},
+  {k:"walk", t:"8:00", n:"Walk", d:"", days:[0,1,2,3,4,5,6]},
+];
+const LS = {get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+
+let cfg = JSON.parse(LS.get("cfg")||"null");
+let data = JSON.parse(LS.get("cache")||'{"days":{}}');
+let sha = null, dirty = LS.get("dirty")==="1", saveTimer = null, saving = false;
+let sel = iso(new Date());
+
+function iso(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function parse(s){const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)}
+function addDays(s,n){const d=parse(s);d.setDate(d.getDate()+n);return iso(d)}
+function weekNo(s){return Math.max(1,Math.floor((parse(s)-parse(START))/864e5/7)+1)}
+function itemsFor(s){const wd=parse(s).getDay();return ITEMS.filter(i=>i.days.includes(wd))}
+function day(s){return data.days[s]||{}}
+function walkMins(w){return w<=1?10:w===2?15:w===3?20:30}
+function ropeText(w){return w<=1?"30s on / 30s off × 3":w===2?"30s on / 30s off × 5":w===3?"45s on / 30s off × 5":"60s on / 30s off × 5"}
+function score(s){const its=itemsFor(s),d=day(s);return its.length?its.filter(i=>d[i.k]).length/its.length:0}
+
+function setSync(state,text){const dot=document.getElementById("syncDot");dot.className="dot "+(state||"");document.getElementById("syncText").textContent=text}
+
+function render(){
+  const today=iso(new Date());
+  document.getElementById("todayLabel").textContent=parse(today).toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
+  document.getElementById("dayTitle").textContent= sel===today?"Today":parse(sel).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});
+  document.getElementById("nextDay").disabled = sel>=today;
+  const w=weekNo(sel), d=day(sel);
+  const ul=document.getElementById("checklist"); ul.innerHTML="";
+  itemsFor(sel).forEach(i=>{
+    const li=document.createElement("li"); li.className="item"+(d[i.k]?" done":""); li.tabIndex=0; li.setAttribute("role","checkbox"); li.setAttribute("aria-checked",!!d[i.k]);
+    const detail = i.k==="walk"? walkMins(w)+" min" : i.k==="rope"? ropeText(w) : i.d;
+    li.innerHTML='<span class="time"></span><span class="what"><b></b><small></small></span><span class="check"></span>';
+    li.querySelector(".time").textContent=i.t; li.querySelector("b").textContent=i.n; li.querySelector("small").textContent=detail;
+    const toggle=()=>{edit(sel,{[i.k]:!d[i.k]})};
+    li.onclick=toggle; li.onkeydown=e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();toggle()}};
+    ul.appendChild(li);
+  });
+  const b=d.beers||0; document.getElementById("beerCount").textContent=b;
+  const tag=document.getElementById("beerTag"); tag.textContent=b===0?"Alcohol-free":b<=2?"Within plan":"Over 2"; tag.className="tag"+(b>2?" over":"");
+  const note=document.getElementById("note"); if(document.activeElement!==note) note.value=d.note||"";
+
+  // week (Mon-Sun containing sel)
+  const wd=(parse(sel).getDay()+6)%7, mon=addDays(sel,-wd);
+  const wk=document.getElementById("week"); wk.innerHTML="";
+  let walks=0,beers=0,af=0;
+  for(let k=0;k<7;k++){
+    const s=addDays(mon,k), dd=day(s), sc=score(s), past=s<=today;
+    if(dd.walk) walks++; beers+=dd.beers||0; if(past && (dd.beers||0)===0) af++;
+    const btn=document.createElement("button"); btn.className="wd"+(s===sel?" sel":""); btn.setAttribute("aria-label",s);
+    const C=2*Math.PI*14;
+    btn.innerHTML='<span></span><svg class="ring" viewBox="0 0 34 34"><circle cx="17" cy="17" r="14" fill="none" stroke="var(--line)" stroke-width="4"/>'+(sc>0?'<circle cx="17" cy="17" r="14" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" transform="rotate(-90 17 17)" stroke-dasharray="'+(C*sc)+' '+C+'"/>':'')+'</svg><span class="b"></span>';
+    btn.querySelector("span").textContent=parse(s).toLocaleDateString(undefined,{weekday:"narrow"});
+    btn.querySelector(".b").textContent=past?(dd.beers?dd.beers+" beer"+(dd.beers>1?"s":""):"AF"):"";
+    btn.onclick=()=>{sel=s;render()};
+    wk.appendChild(btn);
+  }
+  document.getElementById("stWalks").textContent=walks+"/7";
+  const sb=document.getElementById("stBeers"); sb.textContent=beers; sb.style.color=beers>6?"var(--warn)":"";
+  document.getElementById("stAF").textContent=af;
+
+  // streak: consecutive days (ending today or yesterday) with stretch done
+  let st=0, s=day(today).stretch?today:addDays(today,-1);
+  while(day(s).stretch){st++; s=addDays(s,-1)}
+  document.getElementById("streak").textContent=st+"-day";
+  const tw=weekNo(today);
+  document.getElementById("phase").textContent = today<START ? "Plan starts Wednesday, Oct 28." :
+    "Week "+Math.min(tw,4)+(tw>4?"+":"")+" of the plan: walks "+walkMins(tw)+" min, jump rope "+ropeText(tw)+".";
+}
+
+function edit(s,patch){
+  data.days[s]=Object.assign({},day(s),patch,{updated:new Date().toISOString()});
+  LS.set("cache",JSON.stringify(data)); dirty=true; LS.set("dirty","1");
+  render(); scheduleSave();
+}
+function scheduleSave(){ if(!cfg) {setSync("bad","Saved on phone only");return} setSync("","Saving…"); clearTimeout(saveTimer); saveTimer=setTimeout(save,1200) }
+
+const api = p => "https://api.github.com/repos/"+cfg.owner+"/"+cfg.repo+"/contents/"+p;
+const hdr = () => ({"Authorization":"Bearer "+cfg.token,"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"});
+const b64e = s => btoa(unescape(encodeURIComponent(s)));
+const b64d = s => decodeURIComponent(escape(atob(s.replace(/\n/g,""))));
+
+async function load(){
+  if(!cfg){setSync("bad","Not connected");return}
+  setSync("","Loading…");
+  try{
+    const r=await fetch(api("log.json")+"?t="+Date.now(),{headers:hdr(),cache:"no-store"});
+    if(r.status===404){sha=null; if(dirty) await save(); else setSync("ok","Connected"); return}
+    if(!r.ok) throw new Error(r.status);
+    const j=await r.json(); sha=j.sha;
+    const remote=JSON.parse(b64d(j.content));
+    data = merge(remote,data);
+    LS.set("cache",JSON.stringify(data)); render();
+    if(dirty) await save(); else setSync("ok","Synced");
+  }catch(e){ setSync("bad", e.message==="401"?"Token rejected":"Offline, saved on phone") }
+}
+function merge(a,b){ // per-day, newest edit wins
+  const out={days:{}}; const keys=new Set([...Object.keys(a.days||{}),...Object.keys(b.days||{})]);
+  keys.forEach(k=>{const x=(a.days||{})[k],y=(b.days||{})[k]; out.days[k]=!x?y:!y?x:((y.updated||"")>(x.updated||"")?y:x)});
+  return out;
+}
+async function save(){
+  if(!cfg||saving) return; saving=true;
+  try{
+    const body={message:"Log "+iso(new Date()),content:b64e(JSON.stringify(data,null,1))}; if(sha) body.sha=sha;
+    let r=await fetch(api("log.json"),{method:"PUT",headers:hdr(),body:JSON.stringify(body)});
+    if(r.status===409||r.status===422){ saving=false; sha=null; const g=await fetch(api("log.json")+"?t="+Date.now(),{headers:hdr(),cache:"no-store"}); if(g.ok){const j=await g.json(); sha=j.sha; data=merge(JSON.parse(b64d(j.content)),data);} saving=true; body.sha=sha; body.content=b64e(JSON.stringify(data,null,1)); r=await fetch(api("log.json"),{method:"PUT",headers:hdr(),body:JSON.stringify(body)}); }
+    if(!r.ok) throw new Error(r.status);
+    sha=(await r.json()).content.sha; dirty=false; LS.set("dirty","0"); setSync("ok","Saved to GitHub");
+  }catch(e){ setSync("bad", e.message==="401"?"Token rejected":"Couldn't save, will retry") }
+  saving=false;
+}
+
+document.getElementById("prevDay").onclick=()=>{sel=addDays(sel,-1);render()};
+document.getElementById("nextDay").onclick=()=>{const t=iso(new Date()); if(sel<t){sel=addDays(sel,1);render()}};
+document.getElementById("beerPlus").onclick=()=>edit(sel,{beers:(day(sel).beers||0)+1});
+document.getElementById("beerMinus").onclick=()=>edit(sel,{beers:Math.max(0,(day(sel).beers||0)-1)});
+let noteTimer; document.getElementById("note").oninput=e=>{clearTimeout(noteTimer); const v=e.target.value; noteTimer=setTimeout(()=>edit(sel,{note:v}),800)};
+document.getElementById("settingsBtn").onclick=()=>{const s=document.getElementById("setup"); s.hidden=!s.hidden; if(cfg){cfgOwner.value=cfg.owner; cfgRepo.value=cfg.repo}};
+document.getElementById("syncBtn").onclick=load;
+document.getElementById("connectBtn").onclick=async()=>{
+  const c={owner:cfgOwner.value.trim(),repo:cfgRepo.value.trim(),token:cfgToken.value.trim()||(cfg&&cfg.token)};
+  const err=document.getElementById("setupErr"); err.hidden=true;
+  if(!c.owner||!c.repo||!c.token){err.textContent="Fill in all three fields.";err.hidden=false;return}
+  const r=await fetch("https://api.github.com/repos/"+c.owner+"/"+c.repo,{headers:{"Authorization":"Bearer "+c.token,"Accept":"application/vnd.github+json"}}).catch(()=>null);
+  if(!r||!r.ok){err.textContent=!r?"No connection. Try again when online.":r.status===404?"Repo not found. Check the username, repo name, and that the token can access that repo.":"GitHub rejected the token ("+r.status+").";err.hidden=false;return}
+  cfg=c; LS.set("cfg",JSON.stringify(cfg)); cfgToken.value=""; document.getElementById("setup").hidden=true; load();
+};
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){sel=sel>iso(new Date())?iso(new Date()):sel; load()}});
+window.addEventListener("online",()=>{if(dirty) save()});
+
+if(!cfg) document.getElementById("setup").hidden=false;
+render(); load();
+</script>
+</body>
+</html>

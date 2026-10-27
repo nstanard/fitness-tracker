@@ -98,6 +98,16 @@ textarea{width:100%;min-height:64px;font:inherit;color:inherit;background:var(--
 .cd .bc{position:absolute;right:2px;top:1px;font-size:.62rem;font-weight:700;color:var(--muted)}
 .cd .bc.over{color:var(--warn)}
 .legend{font-size:.8rem;margin:0}
+.wt{display:flex;align-items:baseline;gap:8px}
+.wt input{width:6.5ch;font:700 2rem var(--display);color:var(--fg);background:none;border:0;border-bottom:2px solid var(--line);padding:0 2px;font-variant-numeric:tabular-nums;border-radius:0}
+.wt input:focus{border-bottom-color:var(--accent);outline:none}
+.wt span{color:var(--muted);font-weight:600}
+.wchart{padding:14px;display:grid;gap:8px}
+.wsum{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.wsum b{font:700 1.5rem var(--display);font-variant-numeric:tabular-nums}
+.wsum small{color:var(--muted)}
+#wSvg svg{width:100%;height:auto;display:block}
+#wSvg text{font:11px var(--body);fill:var(--muted)}
 .stat{padding:12px}
 .stat .n{font:700 1.7rem var(--display);font-variant-numeric:tabular-nums;line-height:1.1}
 .stat .l{font-size:.8rem;color:var(--muted)}
@@ -148,6 +158,14 @@ textarea{width:100%;min-height:64px;font:inherit;color:inherit;background:var(--
     <ul class="list card" id="checklist"></ul>
   </section>
 
+  <section id="viewDayWeight">
+    <h2>Weight</h2>
+    <div class="card beer">
+      <label class="wt" for="weight"><input id="weight" type="number" inputmode="decimal" step="0.1" min="50" max="600" placeholder="Add"><span>lb</span></label>
+      <span class="tag" id="wtTag" hidden></span>
+    </div>
+  </section>
+
   <section id="viewDayBeer">
     <h2>Beer</h2>
     <div class="card beer">
@@ -178,6 +196,14 @@ textarea{width:100%;min-height:64px;font:inherit;color:inherit;background:var(--
 
   <section id="viewWeekList">
     <ul class="list card" id="weekList"></ul>
+  </section>
+
+  <section id="viewWeight">
+    <h2>Weight</h2>
+    <div class="card wchart">
+      <div class="wsum"><span><b id="wLatest">–</b> <small>latest</small></span><span id="wChange" class="muted"></span></div>
+      <div id="wSvg"></div>
+    </div>
   </section>
 
   <section id="viewMonth">
@@ -255,7 +281,7 @@ function render(){
   if(sel>today) sel=today;
   document.getElementById("todayLabel").textContent=parse(today).toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
   document.querySelectorAll(".seg button").forEach(b=>b.setAttribute("aria-selected",b.dataset.view===view));
-  show("viewDay",view==="day"); show("viewDayBeer",view==="day"); show("viewWeekStrip",view==="day");
+  show("viewDay",view==="day"); show("viewDayBeer",view==="day"); show("viewDayWeight",view==="day"); show("viewWeight",view!=="day"); show("viewWeekStrip",view==="day");
   show("viewWeekList",view==="week"); show("viewMonth",view==="month");
 
   const title=document.getElementById("dayTitle"), next=document.getElementById("nextDay"), tbtn=document.getElementById("todayBtn");
@@ -287,6 +313,7 @@ function render(){
   if(view==="day") renderStrip(from,today);
   if(view==="week") renderWeekList(from,today);
   if(view==="month") renderMonth(from,today);
+  if(view!=="day") renderWeight(from,to,today);
 
   let sk=0, s=day(today).stretch?today:addDays(today,-1);
   while(day(s).stretch){sk++; s=addDays(s,-1)}
@@ -311,6 +338,29 @@ function renderDay(today){
   const b=d.beers||0; document.getElementById("beerCount").textContent=b;
   const tag=document.getElementById("beerTag"); tag.textContent=b===0?"Alcohol-free":b<=2?"Within plan":"Over 2"; tag.className="tag"+(b>2?" over":"");
   const note=document.getElementById("note"); if(document.activeElement!==note) note.value=d.note||"";
+  const wi=document.getElementById("weight"); if(document.activeElement!==wi) wi.value=d.weight??"";
+  const wt=document.getElementById("wtTag"), prev=prevWeight(sel);
+  if(d.weight&&prev){const diff=d.weight-prev.w; wt.hidden=false; wt.className="tag"; wt.textContent=(diff>0?"+":diff<0?"−":"±")+Math.abs(diff).toFixed(1)+" lb since "+parse(prev.s).toLocaleDateString(undefined,{month:"short",day:"numeric"});}
+  else wt.hidden=true;
+}
+function prevWeight(s){const ks=Object.keys(data.days).filter(k=>k<s&&data.days[k].weight).sort(); const k=ks[ks.length-1]; return k?{s:k,w:data.days[k].weight}:null}
+function renderWeight(from,to,today){
+  const pts=[]; for(let s=from;s<=to&&s<=today;s=addDays(s,1)){const w=day(s).weight; if(w) pts.push({s,w})}
+  const box=document.getElementById("wSvg"), latest=document.getElementById("wLatest"), ch=document.getElementById("wChange");
+  if(!pts.length){latest.textContent="–"; ch.textContent="No weigh-ins yet"; box.innerHTML=""; return}
+  latest.textContent=pts[pts.length-1].w.toFixed(1)+" lb";
+  const diff=pts[pts.length-1].w-pts[0].w; ch.textContent=pts.length>1?((diff>0?"+":diff<0?"−":"±")+Math.abs(diff).toFixed(1)+" lb over "+(view==="month"?"the month":"the week")):"1 weigh-in";
+  const W=340,H=120,L=34,R=8,T=10,B=20, n=Math.round((parse(to)-parse(from))/864e5);
+  let lo=Math.min(...pts.map(p=>p.w)),hi=Math.max(...pts.map(p=>p.w)); if(hi-lo<2){const m=(hi+lo)/2;lo=m-1;hi=m+1}
+  lo=Math.floor(lo);hi=Math.ceil(hi);
+  const x=s=>L+(W-L-R)*(Math.round((parse(s)-parse(from))/864e5)/Math.max(1,n)), y=w=>T+(H-T-B)*(1-(w-lo)/(hi-lo));
+  let g='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Weight chart">';
+  [lo,hi].forEach(v=>{g+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="var(--line)" stroke-width="1"/><text x="'+(L-6)+'" y="'+(y(v)+4)+'" text-anchor="end">'+v+'</text>'});
+  const fmt=s=>parse(s).toLocaleDateString(undefined,{month:"short",day:"numeric"});
+  g+='<text x="'+L+'" y="'+(H-4)+'">'+fmt(from)+'</text><text x="'+(W-R)+'" y="'+(H-4)+'" text-anchor="end">'+fmt(to)+'</text>';
+  if(pts.length>1) g+='<polyline fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="'+pts.map(p=>x(p.s)+","+y(p.w)).join(" ")+'"/>';
+  pts.forEach((p,i)=>{g+='<circle cx="'+x(p.s)+'" cy="'+y(p.w)+'" r="'+(i===pts.length-1?4.5:3)+'" fill="'+(i===pts.length-1?"var(--accent)":"var(--surface)")+'" stroke="var(--accent)" stroke-width="2"/>'});
+  box.innerHTML=g+'</svg>';
 }
 
 function renderStrip(mon,today){
@@ -414,6 +464,7 @@ document.getElementById("todayBtn").onclick=()=>{sel=iso(new Date());render()};
 document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>setView(b.dataset.view));
 document.getElementById("beerPlus").onclick=()=>edit(sel,{beers:(day(sel).beers||0)+1});
 document.getElementById("beerMinus").onclick=()=>edit(sel,{beers:Math.max(0,(day(sel).beers||0)-1)});
+let wTimer; document.getElementById("weight").oninput=e=>{clearTimeout(wTimer); const v=e.target.value; wTimer=setTimeout(()=>{const n=parseFloat(v); edit(sel,{weight: isFinite(n)&&n>=50&&n<=600? Math.round(n*10)/10 : null})},900)};
 let noteTimer; document.getElementById("note").oninput=e=>{clearTimeout(noteTimer); const v=e.target.value; noteTimer=setTimeout(()=>edit(sel,{note:v}),800)};
 document.getElementById("settingsBtn").onclick=()=>{const s=document.getElementById("setup"); s.hidden=!s.hidden; if(cfg){cfgOwner.value=cfg.owner; cfgRepo.value=cfg.repo}};
 document.getElementById("syncBtn").onclick=load;

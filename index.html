@@ -98,6 +98,17 @@ textarea{width:100%;min-height:64px;font:inherit;color:inherit;background:var(--
 .cd .bc{position:absolute;right:2px;top:1px;font-size:.62rem;font-weight:700;color:var(--muted)}
 .cd .bc.over{color:var(--warn)}
 .legend{font-size:.8rem;margin:0}
+.wkhead{display:flex;justify-content:space-between;align-items:baseline}
+.wktotal{font:700 1.1rem var(--display);color:var(--accent);font-variant-numeric:tabular-nums}
+.walklog{padding:14px;display:grid;gap:12px}
+.walklist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.walklist:empty{display:none}
+.walklist li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border-radius:8px;font-variant-numeric:tabular-nums}
+.walklist li button{border:0;background:none;color:var(--muted);padding:4px 8px;font-size:.85rem}
+.walkadd{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.walkadd .wt input{width:4.5ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{padding:6px 12px;border-radius:999px;font-size:.9rem;font-variant-numeric:tabular-nums}
 .wt{display:flex;align-items:baseline;gap:8px}
 .wt input{width:6.5ch;font:700 2rem var(--display);color:var(--fg);background:none;border:0;border-bottom:2px solid var(--line);padding:0 2px;font-variant-numeric:tabular-nums;border-radius:0}
 .wt input:focus{border-bottom-color:var(--accent);outline:none}
@@ -158,6 +169,18 @@ textarea{width:100%;min-height:64px;font:inherit;color:inherit;background:var(--
     <ul class="list card" id="checklist"></ul>
   </section>
 
+  <section id="viewDayWalks">
+    <div class="wkhead"><h2>Walks</h2><span class="wktotal" id="walkTotal">0 min</span></div>
+    <div class="card walklog">
+      <ul class="walklist" id="walkList"></ul>
+      <div class="walkadd">
+        <label class="wt" for="walkMin"><input id="walkMin" type="number" inputmode="numeric" min="1" max="600" placeholder="0"><span>min</span></label>
+        <button class="primary" id="walkAdd">Add walk</button>
+      </div>
+      <div class="chips" id="walkChips"></div>
+    </div>
+  </section>
+
   <section id="viewDayWeight">
     <h2>Weight</h2>
     <div class="card beer">
@@ -184,7 +207,7 @@ textarea{width:100%;min-height:64px;font:inherit;color:inherit;background:var(--
     <h2 id="statsTitle">This week</h2>
     <div class="stats">
       <div class="card stat"><div class="n" id="stDone">0%</div><div class="l">Routine done</div></div>
-      <div class="card stat"><div class="n" id="stWalks">0</div><div class="l">Walk days</div></div>
+      <div class="card stat"><div class="n" id="stWalks">0</div><div class="l" id="stWalksL">Walking</div></div>
       <div class="card stat"><div class="n" id="stBeers">0</div><div class="l" id="stBeersL">Beers (cap 6)</div></div>
       <div class="card stat"><div class="n" id="stAF">0</div><div class="l">Alcohol-free days</div></div>
     </div>
@@ -237,6 +260,7 @@ const ITEMS = [
   {k:"rope", t:"6:15", n:"Jump rope or bike", d:"", days:[1,3,5]},
   {k:"breakfast", t:"6:45", n:"Breakfast", d:"Oatmeal, banana, protein", days:[0,1,2,3,4,5,6]},
   {k:"walk", t:"8:00", n:"Walk", d:"", days:[0,1,2,3,4,5,6]},
+  {k:"feet", t:"8 pm", n:"Foot & nail care", d:"Evening routine", days:[0,1,2,3,4,5,6]},
 ];
 const LS = {get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
 
@@ -251,26 +275,30 @@ function addDays(s,n){const d=parse(s);d.setDate(d.getDate()+n);return iso(d)}
 function weekNo(s){return Math.max(1,Math.floor((parse(s)-parse(START))/864e5/7)+1)}
 function itemsFor(s){const wd=parse(s).getDay();return ITEMS.filter(i=>i.days.includes(wd))}
 function day(s){return data.days[s]||{}}
+function walksOf(d){return Array.isArray(d.walks)?d.walks:(d.walk?[0]:[])}
+function walkTotal(d){return walksOf(d).reduce((a,b)=>a+(b||0),0)}
+function fmtMin(m){return m>=60?Math.floor(m/60)+"h "+(m%60?String(m%60).padStart(2,"0")+"m":""):m+"m"}
 function walkMins(w){return w<=1?10:w===2?15:w===3?20:30}
 function ropeText(w){return w<=1?"30s on / 30s off × 3":w===2?"30s on / 30s off × 5":w===3?"45s on / 30s off × 5":"60s on / 30s off × 5"}
-function score(s){const its=itemsFor(s),d=day(s);return its.length?its.filter(i=>d[i.k]).length/its.length:0}
+function isDone(i,d){return i.k==="walk"?walksOf(d).length>0:!!d[i.k]}
+function score(s){const its=itemsFor(s),d=day(s);return its.length?its.filter(i=>isDone(i,d)).length/its.length:0}
 
 function setSync(state,text){const dot=document.getElementById("syncDot");dot.className="dot "+(state||"");document.getElementById("syncText").textContent=text}
 
 let view = LS.get("view")||"day";
-const SHORT={coffee:"Coffee",stretch:"Stretch",lift:"Lift",rope:"Rope",breakfast:"Bkfst",walk:"Walk"};
+const SHORT={coffee:"Coffee",stretch:"Stretch",lift:"Lift",rope:"Rope",breakfast:"Bkfst",walk:"Walk",feet:"Feet"};
 function mondayOf(s){return addDays(s,-((parse(s).getDay()+6)%7))}
 function monthStart(s){return s.slice(0,8)+"01"}
 function addMonths(s,n){const d=parse(monthStart(s));d.setMonth(d.getMonth()+n);return iso(d)}
 function ringSVG(sc,r,w){const C=2*Math.PI*r,c=r+w/2,size=2*c;return '<svg viewBox="0 0 '+size+' '+size+'" aria-hidden="true"><circle cx="'+c+'" cy="'+c+'" r="'+r+'" fill="none" stroke="var(--line)" stroke-width="'+w+'"/>'+(sc>0?'<circle cx="'+c+'" cy="'+c+'" r="'+r+'" fill="none" stroke="var(--accent)" stroke-width="'+w+'" stroke-linecap="round" transform="rotate(-90 '+c+' '+c+')" stroke-dasharray="'+(C*sc)+' '+C+'"/>':'')+'</svg>'}
 function rangeStats(from,to,today){
-  let poss=0,done=0,walks=0,beers=0,af=0,days=0;
+  let poss=0,done=0,walks=0,wmin=0,beers=0,af=0,days=0;
   for(let s=from;s<=to&&s<=today;s=addDays(s,1)){
     const its=itemsFor(s),d=day(s); days++;
-    poss+=its.length; done+=its.filter(i=>d[i.k]).length;
-    if(d.walk) walks++; beers+=d.beers||0; if(!(d.beers>0)) af++;
+    poss+=its.length; done+=its.filter(i=>isDone(i,d)).length;
+    if(walksOf(d).length){walks++; wmin+=walkTotal(d)} beers+=d.beers||0; if(!(d.beers>0)) af++;
   }
-  return {pct:poss?Math.round(100*done/poss):0,walks,beers,af,days};
+  return {pct:poss?Math.round(100*done/poss):0,walks,wmin,beers,af,days};
 }
 function show(id,on){document.getElementById(id).hidden=!on}
 function setView(v){view=v;LS.set("view",v);render();window.scrollTo(0,0)}
@@ -281,7 +309,7 @@ function render(){
   if(sel>today) sel=today;
   document.getElementById("todayLabel").textContent=parse(today).toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
   document.querySelectorAll(".seg button").forEach(b=>b.setAttribute("aria-selected",b.dataset.view===view));
-  show("viewDay",view==="day"); show("viewDayBeer",view==="day"); show("viewDayWeight",view==="day"); show("viewWeight",view!=="day"); show("viewWeekStrip",view==="day");
+  show("viewDay",view==="day"); show("viewDayBeer",view==="day"); show("viewDayWeight",view==="day"); show("viewDayWalks",view==="day"); show("viewWeight",view!=="day"); show("viewWeekStrip",view==="day");
   show("viewWeekList",view==="week"); show("viewMonth",view==="month");
 
   const title=document.getElementById("dayTitle"), next=document.getElementById("nextDay"), tbtn=document.getElementById("todayBtn");
@@ -303,7 +331,7 @@ function render(){
   const st=rangeStats(from,to,today);
   document.getElementById("statsTitle").textContent = view==="month"?"This month":(view==="week"&&!atToday?"That week":"This week");
   document.getElementById("stDone").textContent=st.pct+"%";
-  document.getElementById("stWalks").textContent=st.walks+"/"+st.days;
+  document.getElementById("stWalks").textContent=fmtMin(st.wmin); document.getElementById("stWalksL").textContent="Walking, "+st.walks+"/"+st.days+" days";
   const sb=document.getElementById("stBeers"), weeks=Math.max(1,st.days/7);
   if(view==="month"){ sb.textContent=st.beers; document.getElementById("stBeersL").textContent=(st.beers/weeks).toFixed(1)+" a week avg"; sb.style.color=st.beers/weeks>6?"var(--warn)":""; }
   else { sb.textContent=st.beers; document.getElementById("stBeersL").textContent="Beers (cap 6)"; sb.style.color=st.beers>6?"var(--warn)":""; }
@@ -320,7 +348,7 @@ function render(){
   document.getElementById("streak").textContent=sk+"-day";
   const tw=weekNo(today);
   document.getElementById("phase").textContent = today<START ? "Plan starts Wednesday, Oct 28." :
-    "Week "+Math.min(tw,4)+(tw>4?"+":"")+" of the plan: walks "+walkMins(tw)+" min, jump rope "+ropeText(tw)+".";
+    "Week "+Math.min(tw,4)+(tw>4?"+":"")+" of the plan. Jump rope: "+ropeText(tw)+".";
 }
 
 function renderDay(today){
@@ -328,16 +356,21 @@ function renderDay(today){
   const ul=document.getElementById("checklist"); ul.innerHTML="";
   itemsFor(sel).forEach(i=>{
     const li=document.createElement("li"); li.className="item"+(d[i.k]?" done":""); li.tabIndex=0; li.setAttribute("role","checkbox"); li.setAttribute("aria-checked",!!d[i.k]);
-    const detail = i.k==="walk"? walkMins(w)+" min" : i.k==="rope"? ropeText(w) : i.d;
+    const wt=walkTotal(d), wn=walksOf(d).length;
+    const detail = i.k==="walk"? (wn? wt+" min logged"+(wn>1?" in "+wn+" walks":"") : "Log it below") : i.k==="rope"? ropeText(w) : i.d;
+    if(i.k==="walk"&&wn){li.classList.add("done"); li.setAttribute("aria-checked",true)}
     li.innerHTML='<span class="time"></span><span class="what"><b></b><small></small></span><span class="check"></span>';
     li.querySelector(".time").textContent=i.t; li.querySelector("b").textContent=i.n; li.querySelector("small").textContent=detail;
-    const toggle=()=>{edit(sel,{[i.k]:!d[i.k]})};
+    const toggle= i.k==="walk" ? ()=>{const m=document.getElementById("walkMin"); m.scrollIntoView({behavior:"smooth",block:"center"}); m.focus({preventScroll:true})} : ()=>{edit(sel,{[i.k]:!d[i.k]})};
     li.onclick=toggle; li.onkeydown=e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();toggle()}};
     ul.appendChild(li);
   });
   const b=d.beers||0; document.getElementById("beerCount").textContent=b;
   const tag=document.getElementById("beerTag"); tag.textContent=b===0?"Alcohol-free":b<=2?"Within plan":"Over 2"; tag.className="tag"+(b>2?" over":"");
   const note=document.getElementById("note"); if(document.activeElement!==note) note.value=d.note||"";
+  const wl=document.getElementById("walkList"); wl.innerHTML="";
+  walksOf(d).forEach((m,ix)=>{const li=document.createElement("li"); li.innerHTML='<span></span><button aria-label="Remove walk">Remove</button>'; li.querySelector("span").textContent="Walk "+(ix+1)+" · "+(m?m+" min":"time not logged"); li.querySelector("button").onclick=()=>{const a=walksOf(day(sel)).slice(); a.splice(ix,1); edit(sel,{walks:a,walk:a.length>0})}; wl.appendChild(li)});
+  document.getElementById("walkTotal").textContent=fmtMin(walkTotal(d));
   const wi=document.getElementById("weight"); if(document.activeElement!==wi) wi.value=d.weight??"";
   const wt=document.getElementById("wtTag"), prev=prevWeight(sel);
   if(d.weight&&prev){const diff=d.weight-prev.w; wt.hidden=false; wt.className="tag"; wt.textContent=(diff>0?"+":diff<0?"−":"±")+Math.abs(diff).toFixed(1)+" lb since "+parse(prev.s).toLocaleDateString(undefined,{month:"short",day:"numeric"});}
@@ -386,7 +419,7 @@ function renderWeekList(mon,today){
     li.querySelector(".dname").innerHTML=''; li.querySelector(".dname").append(D.toLocaleDateString(undefined,{weekday:"short"}));
     const sm=document.createElement("small"); sm.textContent=D.toLocaleDateString(undefined,{month:"short",day:"numeric"}); li.querySelector(".dname").appendChild(sm);
     const pips=li.querySelector(".pips");
-    itemsFor(s).forEach(i=>{const p=document.createElement("span"); p.className="pip"+(d[i.k]?" on":""); p.textContent=SHORT[i.k]; pips.appendChild(p)});
+    itemsFor(s).forEach(i=>{const p=document.createElement("span"); const on=i.k==="walk"?walksOf(d).length>0:d[i.k]; p.className="pip"+(on?" on":""); p.textContent=i.k==="walk"&&walkTotal(d)?"Walk "+walkTotal(d)+"m":SHORT[i.k]; pips.appendChild(p)});
     const wb=li.querySelector(".wbeer"); wb.textContent=past?((d.beers||0)?d.beers+" beer"+((d.beers>1)?"s":""):"AF"):"";
     if((d.beers||0)>2) wb.classList.add("over");
     if(past){li.tabIndex=0; li.onclick=()=>openDay(s); li.onkeydown=e=>{if(e.key==="Enter"){openDay(s)}}}
@@ -464,6 +497,10 @@ document.getElementById("todayBtn").onclick=()=>{sel=iso(new Date());render()};
 document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>setView(b.dataset.view));
 document.getElementById("beerPlus").onclick=()=>edit(sel,{beers:(day(sel).beers||0)+1});
 document.getElementById("beerMinus").onclick=()=>edit(sel,{beers:Math.max(0,(day(sel).beers||0)-1)});
+function addWalk(m){m=Math.round(m); if(!(m>0&&m<=600)) return; const a=walksOf(day(sel)).filter(x=>x>0||walksOf(day(sel)).length>0).slice(); if(a.length===1&&a[0]===0) a.length=0; a.push(m); document.getElementById("walkMin").value=""; edit(sel,{walks:a,walk:true})}
+document.getElementById("walkAdd").onclick=()=>addWalk(parseFloat(document.getElementById("walkMin").value));
+document.getElementById("walkMin").onkeydown=e=>{if(e.key==="Enter") addWalk(parseFloat(e.target.value))};
+[15,20,30,45,60].forEach(m=>{const b=document.createElement("button"); b.textContent=m+" min"; b.onclick=()=>addWalk(m); document.getElementById("walkChips").appendChild(b)});
 let wTimer; document.getElementById("weight").oninput=e=>{clearTimeout(wTimer); const v=e.target.value; wTimer=setTimeout(()=>{const n=parseFloat(v); edit(sel,{weight: isFinite(n)&&n>=50&&n<=600? Math.round(n*10)/10 : null})},900)};
 let noteTimer; document.getElementById("note").oninput=e=>{clearTimeout(noteTimer); const v=e.target.value; noteTimer=setTimeout(()=>edit(sel,{note:v}),800)};
 document.getElementById("settingsBtn").onclick=()=>{const s=document.getElementById("setup"); s.hidden=!s.hidden; if(cfg){cfgOwner.value=cfg.owner; cfgRepo.value=cfg.repo}};

@@ -115,6 +115,27 @@ header>*{min-width:0}
 .chips{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .chips button{padding:7px 0;border-radius:999px;font-size:.88rem;font-variant-numeric:tabular-nums}
 
+/* workout logger */
+.worklog{padding-left:14px}
+.exlist{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.exlist:empty{display:none}
+.exrow{background:var(--sunk);border-radius:10px;padding:8px 10px;display:grid;gap:6px}
+.extop{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.exrm{border:0;background:none;color:var(--muted);padding:2px 4px;font-size:.85rem}
+.exfields{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:.9rem}
+.nin{font:600 1.05rem var(--body);color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 4px;text-align:center;font-variant-numeric:tabular-nums;min-width:0}
+.nin::placeholder{color:var(--line)}
+.exchips{display:flex;flex-wrap:wrap;gap:6px}
+.exchips button{padding:7px 12px;border-radius:999px;font-size:.88rem}
+.otherform{display:grid;grid-template-columns:1fr auto auto;gap:6px}
+.otherform input,.otherform select{font:inherit;color:inherit;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:7px 8px;min-width:0}
+.extot{display:grid;grid-template-columns:1fr auto;grid-template-areas:"n t" "s t";gap:0 12px;padding:10px 14px;border-top:1px solid var(--line)}
+.extot:first-child{border-top:0}
+.exn{grid-area:n;font-weight:600}
+.exs{grid-area:s;font-size:.8rem}
+.ext{grid-area:t;align-self:center;font:700 1.15rem var(--display);font-variant-numeric:tabular-nums}
+.exempty{padding:14px;font-size:.9rem}
+
 /* today's numbers */
 .nums{display:grid;grid-template-columns:1fr 1fr}
 .nums>div{padding:12px 14px;display:grid;gap:6px;align-content:start;min-width:0}
@@ -285,6 +306,10 @@ header>*{min-width:0}
     <div class="card cal"><div class="calhead" id="calHead"></div><div class="calgrid" id="calGrid"></div></div>
     <p class="legend muted">Ring: share of the routine done. Number under the date: beers.</p>
   </section>
+  <section id="vEx" class="group">
+    <h2>Exercise <small class="muted" id="exDays" style="font:500 .85rem var(--body);text-transform:none;letter-spacing:0"></small></h2>
+    <div class="card"><ul class="list" id="exTotals"></ul></div>
+  </section>
   <section id="vWeight" class="group">
     <h2>Weight</h2>
     <div class="card wchart">
@@ -307,13 +332,25 @@ const ALL=[0,1,2,3,4,5,6];
 const ITEMS = [
   {k:"coffee",   g:"m", t:"5:40", n:"Coffee",           d:"First cup, half a banana if hungry", days:ALL},
   {k:"stretch",  g:"m", t:"6:00", n:"Stretch",          d:"10 min", days:ALL},
-  {k:"lift",     g:"m", t:"6:15", n:"Dumbbells",        d:"Squat, row, press, RDL, overhead", days:[2,4]},
-  {k:"rope",     g:"m", t:"6:15", n:"Jump rope or bike",d:"", days:[1,3,5]},
+  {k:"workout",  g:"m", t:"6:15", n:"Workout",          d:"", days:ALL},
   {k:"breakfast",g:"m", t:"6:45", n:"Breakfast",        d:"Oatmeal, banana, protein", days:ALL},
   {k:"walk",     g:"m", t:"8:00", n:"Walk",             d:"", days:ALL},
   {k:"feet",     g:"e", t:"8:00", n:"Skin care",        d:"", days:ALL},
 ];
-const NAMES={coffee:"Coffee",stretch:"Stretch",lift:"Dumbbells",rope:"Rope",breakfast:"Breakfast",walk:"Walk",feet:"Skin care"};
+const NAMES={coffee:"Coffee",stretch:"Stretch",workout:"Workout",breakfast:"Breakfast",walk:"Walk",feet:"Skin care"};
+const EX={
+  pushups:{n:"Push-ups",type:"reps",def:{sets:3,reps:10}},
+  pullups:{n:"Pull-ups",type:"reps",def:{sets:3,reps:5}},
+  squat:{n:"Goblet squat",type:"reps",lb:true,def:{sets:2,reps:10}},
+  row:{n:"Dumbbell row",type:"reps",lb:true,def:{sets:2,reps:10}},
+  press:{n:"Floor press",type:"reps",lb:true,def:{sets:2,reps:10}},
+  rdl:{n:"Romanian deadlift",type:"reps",lb:true,def:{sets:2,reps:10}},
+  ohp:{n:"Overhead press",type:"reps",lb:true,def:{sets:2,reps:10}},
+  rope:{n:"Jump rope",type:"intervals",def:{sets:3,sec:30}},
+  bike:{n:"Bike",type:"time",def:{min:20}},
+  plank:{n:"Plank",type:"hold",def:{sets:3,sec:30}},
+};
+const DB_ROUTINE=["squat","row","press","rdl","ohp"];
 const LS={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
 const $=id=>document.getElementById(id);
 
@@ -322,7 +359,7 @@ let data=JSON.parse(LS.get("cache")||'{"days":{}}');
 let sha=null, dirty=LS.get("dirty")==="1", saveTimer=null, saving=false;
 let sel=iso(new Date());
 let view=LS.get("view")||"day";
-let walkOpen=false, noteOpen=false;
+let walkOpen=false, workOpen=false, noteOpen=false;
 
 function iso(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
 function parse(s){const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)}
@@ -338,7 +375,18 @@ function walksOf(d){return Array.isArray(d.walks)?d.walks:(d.walk?[0]:[])}
 function walkTotal(d){return walksOf(d).reduce((a,b)=>a+(b||0),0)}
 function fmtMin(m){return m>=60?Math.floor(m/60)+"h"+(m%60?" "+String(m%60).padStart(2,"0")+"m":""):m+"m"}
 function ropeText(w){return w<=1?"30s on, 30s off × 3":w===2?"30s on, 30s off × 5":w===3?"45s on, 30s off × 5":"60s on, 30s off × 5"}
-function isDone(i,d){return i.k==="walk"?walksOf(d).length>0:!!d[i.k]}
+function workOf(d){return Array.isArray(d.workout)?d.workout:[]}
+function exDef(k){return EX[k]||((data.lib||{})[k])||{n:k,type:"reps"}}
+function isDone(i,d){return i.k==="walk"?walksOf(d).length>0: i.k==="workout"? (workOf(d).length>0||!!d.lift||!!d.rope) : !!d[i.k]}
+function entryText(e){const x=exDef(e.ex), t=x.type;
+  if(!(e.sets||e.reps||e.sec||e.min)) return x.n;
+  if(t==="time") return x.n+" "+(e.min||0)+"m";
+  if(t==="intervals") return x.n+" "+(e.sets||0)+"×"+(e.sec||0)+"s";
+  if(t==="hold") return x.n+" "+(e.sets||0)+"×"+(e.sec||0)+"s";
+  return x.n+" "+(e.sets||0)+"×"+(e.reps||0)+(e.lb?" @"+e.lb:"")}
+function workSummary(wk){return wk.length<=3? wk.map(entryText).join(" · ") : wk.slice(0,2).map(entryText).join(" · ")+" + "+(wk.length-2)+" more"}
+function secText(t){const m=Math.floor(t/60), r=t%60; return m? m+"m"+(r?" "+r+"s":"") : r+"s"}
+function lastEntry(k,before){const ks=Object.keys(data.days).filter(s=>s<before).sort().reverse(); for(const s of ks){const e=workOf(data.days[s]).find(x=>x.ex===k); if(e) return e} return null}
 function score(s){const its=itemsFor(s),d=day(s);return its.length?its.filter(i=>isDone(i,d)).length/its.length:0}
 function ringSVG(sc,r,w){const C=2*Math.PI*r,c=r+w/2,z=2*c;return '<svg viewBox="0 0 '+z+' '+z+'" aria-hidden="true"><circle cx="'+c+'" cy="'+c+'" r="'+r+'" fill="none" stroke="var(--line)" stroke-width="'+w+'"/>'+(sc>0?'<circle cx="'+c+'" cy="'+c+'" r="'+r+'" fill="none" stroke="var(--accent)" stroke-width="'+w+'" stroke-linecap="round" transform="rotate(-90 '+c+' '+c+')" stroke-dasharray="'+(C*sc)+' '+C+'"/>':'')+'</svg>'}
 function signed(n){return (n>0?"+":n<0?"−":"±")+Math.abs(n).toFixed(1)}
@@ -363,7 +411,7 @@ function render(){
   document.querySelectorAll(".seg button").forEach(b=>b.setAttribute("aria-selected",b.dataset.view===view));
   const isDay=view==="day";
   ["vDay","vMorning","vEvening","vNums"].forEach(id=>show(id,isDay));
-  ["vPeriod","vStats","vWeight"].forEach(id=>show(id,!isDay));
+  ["vPeriod","vStats","vEx","vWeight"].forEach(id=>show(id,!isDay));
   show("vWeek",view==="week"); show("vMonth",view==="month");
   if(isDay) renderDay(today); else renderPeriod(today);
   renderProgress(today); renderInfo();
@@ -378,7 +426,7 @@ function renderDay(today){
     b.disabled=!past; b.setAttribute("aria-label",fmt(s,{weekday:"long",month:"long",day:"numeric"})); if(s===sel) b.setAttribute("aria-current","date");
     b.innerHTML='<span class="dn"></span><span class="ring">'+ringSVG(past?score(s):0,14,4)+'<span></span></span>';
     b.querySelector(".dn").textContent=fmt(s,{weekday:"narrow"}); b.querySelector(".ring span").textContent=parse(s).getDate();
-    b.onclick=()=>{sel=s;walkOpen=false;render()}; strip.appendChild(b);
+    b.onclick=()=>{sel=s;walkOpen=false;workOpen=false;render()}; strip.appendChild(b);
   }
   const next=el("button","arrow","›"); next.setAttribute("aria-label","Next week"); next.disabled=addDays(mon,7)>today; next.onclick=()=>{sel=addDays(sel,7);render()}; strip.appendChild(next);
   $("dayTitle").textContent= sel===today?"Today":sel===addDays(today,-1)?"Yesterday":fmt(sel,{weekday:"long",month:"short",day:"numeric"});
@@ -407,16 +455,16 @@ function renderDay(today){
 }
 
 function itemEl(i,d,w,isNext){
-  const li=el("li","item"+(isDone(i,d)?" done":"")+(isNext?" next":""));
+  const li=el("li","item"+(isDone(i,d)?" done":"")+(isNext?" next":"")); li.dataset.k=i.k;
   const head=el("div","ihead"); head.tabIndex=0;
   const wn=walksOf(d).length, wt=walkTotal(d);
   let detail=i.d;
-  if(i.k==="rope") detail=ropeText(w);
+  if(i.k==="workout"){const wk=workOf(d); detail= wk.length? workSummary(wk) : (d.lift||d.rope)? "Logged (no details)" : "Tap to log exercises"}
   if(i.k==="walk") detail= wn ? (wt?wt+" min":"Done")+(wn>1?" in "+wn+" walks":"") : "Tap to log minutes";
   head.innerHTML='<span class="time"></span><span class="what"><b></b><small></small></span><span class="check" aria-hidden="true"></span>';
   head.querySelector(".time").textContent=i.t;
   const bt=head.querySelector("b"); bt.textContent=i.n;
-  if(i.k==="walk"){const c=el("span","chev",walkOpen?"▲":"▼"); bt.appendChild(c)}
+  if(i.k==="walk"||i.k==="workout"){const o=i.k==="walk"?walkOpen:workOpen; bt.appendChild(el("span","chev",o?"▲":"▼"))}
   if(isNext) bt.appendChild(el("span","nexttag","Up next"));
   const sm=head.querySelector("small"); sm.textContent=detail; sm.hidden=!detail;
   if(i.k==="walk"){
@@ -425,6 +473,12 @@ function itemEl(i,d,w,isNext){
     head.onclick=t; head.onkeydown=e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();t()}};
     li.appendChild(head);
     if(walkOpen) li.appendChild(walkLogger(d));
+  } else if(i.k==="workout"){
+    head.setAttribute("role","button"); head.setAttribute("aria-expanded",workOpen);
+    const t=()=>{workOpen=!workOpen; render()};
+    head.onclick=t; head.onkeydown=e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();t()}};
+    li.appendChild(head);
+    if(workOpen) li.appendChild(workLogger(d));
   } else {
     head.setAttribute("role","checkbox"); head.setAttribute("aria-checked",!!d[i.k]);
     const t=()=>edit(sel,{[i.k]:!d[i.k]});
@@ -452,6 +506,45 @@ function walkLogger(d){
   const chips=el("div","chips"); [15,30,45,60].forEach(m=>{const c=el("button",null,m+" min"); c.onclick=()=>addWalk(m); chips.appendChild(c)}); box.appendChild(chips);
   return box;
 }
+function numIn(val,label,w,onSet){const i=el("input","nin"); i.type="number"; i.inputMode="decimal"; i.min=0; i.value=val??""; i.placeholder="–"; i.setAttribute("aria-label",label); i.style.width=w; i.onchange=()=>{const n=parseFloat(i.value); onSet(isFinite(n)&&n>0?Math.round(n*10)/10:null)}; return i}
+function setEntry(ix,patch){const a=workOf(day(sel)).map(e=>Object.assign({},e)); Object.assign(a[ix],patch); data.days[sel]=Object.assign({},day(sel),{workout:a,updated:new Date().toISOString()}); LS.set("cache",JSON.stringify(data)); dirty=true; LS.set("dirty","1"); scheduleSave(); const sm=document.querySelector('#mList .item[data-k="workout"] .what small'); if(sm) sm.textContent=workSummary(a)}
+function workLogger(d){
+  const box=el("div","walklog worklog");
+  const ul=el("ul","exlist");
+  workOf(d).forEach((e,ix)=>{
+    const x=exDef(e.ex), li=el("li","exrow");
+    const top=el("div","extop"); top.appendChild(el("b",null,x.n));
+    const rm=el("button","exrm","Remove"); rm.setAttribute("aria-label","Remove "+x.n);
+    rm.onclick=()=>{const before=JSON.parse(JSON.stringify(day(sel))), s=sel; const a=workOf(day(sel)).slice(); a.splice(ix,1); edit(sel,{workout:a}); toast(x.n+" removed",()=>{data.days[s]=Object.assign(before,{updated:new Date().toISOString()}); commit()})};
+    top.appendChild(rm); li.appendChild(top);
+    const f=el("div","exfields");
+    if(x.type==="time"){ f.append(numIn(e.min,x.n+" minutes","4.5ch",v=>setEntry(ix,{min:v})), el("span","muted","min")) }
+    else if(x.type==="intervals"||x.type==="hold"){ f.append(numIn(e.sets,x.type==="hold"?"Sets":"Rounds","3.5ch",v=>setEntry(ix,{sets:v})), el("span","muted",x.type==="hold"?"sets ×":"rounds ×"), numIn(e.sec,"Seconds","4ch",v=>setEntry(ix,{sec:v})), el("span","muted","sec")) }
+    else { f.append(numIn(e.sets,"Sets","3.5ch",v=>setEntry(ix,{sets:v})), el("span","muted","sets ×"), numIn(e.reps,"Reps","3.5ch",v=>setEntry(ix,{reps:v})), el("span","muted","reps"));
+      if(x.lb||e.lb){f.append(el("span","muted","@"), numIn(e.lb,"Weight in pounds","4ch",v=>setEntry(ix,{lb:v})), el("span","muted","lb"))} }
+    li.appendChild(f); ul.appendChild(li);
+  });
+  box.appendChild(ul);
+  const lab=el("div","lbl","Add exercise"); box.appendChild(lab);
+  const chips=el("div","exchips");
+  const mk=(t,fn)=>{const c=el("button",null,t); c.onclick=fn; chips.appendChild(c)};
+  mk("Dumbbell routine",()=>addEx(DB_ROUTINE));
+  ["pushups","pullups","rope","bike","plank"].forEach(k=>mk(EX[k].n,()=>addEx([k])));
+  Object.keys(data.lib||{}).forEach(k=>mk(data.lib[k].n,()=>addEx([k])));
+  mk("+ Other",()=>{show("otherForm",true); $("otherName").focus()});
+  box.appendChild(chips);
+  const of=el("div","otherform"); of.id="otherForm"; of.hidden=true;
+  of.innerHTML='<input id="otherName" placeholder="Exercise name" aria-label="Exercise name" autocapitalize="words"><select id="otherType" aria-label="How to track it"><option value="reps">Sets × reps</option><option value="time">Minutes</option><option value="hold">Sets × seconds</option></select><button class="primary" id="otherAdd">Add</button>';
+  box.appendChild(of);
+  setTimeout(()=>{const b=$("otherAdd"); if(b) b.onclick=()=>{const n=$("otherName").value.trim(); if(!n) return; const k="c-"+n.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,30); data.lib=Object.assign({},data.lib,{[k]:{n,type:$("otherType").value,def:{}}}); addEx([k])}},0);
+  return box;
+}
+function addEx(keys){const a=workOf(day(sel)).slice(), w=weekNo(sel);
+  keys.forEach(k=>{const x=exDef(k), last=lastEntry(k,sel), e={ex:k};
+    const base=last?{sets:last.sets,reps:last.reps,lb:last.lb,sec:last.sec,min:last.min}:Object.assign({},x.def||{});
+    if(k==="rope"&&!last){base.sets=w<=1?3:5; base.sec=w<=2?30:w===3?45:60}
+    Object.keys(base).forEach(f=>{if(base[f]!=null) e[f]=base[f]}); a.push(e)});
+  edit(sel,{workout:a})}
 function addWalk(m){m=Math.round(m); if(!(m>0&&m<=600)) return; let a=walksOf(day(sel)).slice(); if(a.length===1&&a[0]===0) a=[]; a.push(m); edit(sel,{walks:a,walk:true})}
 function prevWeight(s){const ks=Object.keys(data.days).filter(k=>k<s&&data.days[k].weight).sort(); const k=ks[ks.length-1]; return k?{s:k,w:data.days[k].weight}:null}
 
@@ -475,6 +568,24 @@ function renderPeriod(today){
 
   if(view==="week") renderWeekList(from,today); else renderMonth(from,today);
   renderWeight(from,to,today);
+  renderEx(from,to,today);
+}
+function renderEx(from,to,today){
+  const agg={}; let wdays=0, days=0;
+  for(let s=from;s<=to&&s<=today;s=addDays(s,1)){ days++; const d=day(s), wk=workOf(d); if(wk.length||d.lift||d.rope) wdays++;
+    const seen=new Set();
+    wk.forEach(e=>{const a=agg[e.ex]||(agg[e.ex]={days:0,reps:0,sec:0,min:0,bestReps:0,bestLb:0}); if(!seen.has(e.ex)){a.days++;seen.add(e.ex)}
+      const t=exDef(e.ex).type, sets=e.sets||0;
+      if(t==="reps"){a.reps+=sets*(e.reps||0); a.bestReps=Math.max(a.bestReps,e.reps||0); a.bestLb=Math.max(a.bestLb,e.lb||0)}
+      else if(t==="time") a.min+=e.min||0; else a.sec+=sets*(e.sec||0)})}
+  $("exDays").textContent=wdays+" of "+days+" days";
+  const ul=$("exTotals"); ul.innerHTML="";
+  const keys=Object.keys(agg);
+  if(!keys.length){ul.appendChild(el("li","exempty muted","No exercises logged yet. Open Workout in Day view to add some.")); return}
+  keys.sort((a,b)=>agg[b].days-agg[a].days).forEach(k=>{const a=agg[k], x=exDef(k), li=el("li","extot");
+    const tot= x.type==="reps"? a.reps+" reps" : x.type==="time"? fmtMin(a.min) : secText(a.sec);
+    const best= x.type==="reps"&&a.bestReps? "best set "+a.bestReps+(a.bestLb?" · top "+a.bestLb+" lb":"") : "";
+    li.append(el("span","exn",x.n), el("span","exs muted",a.days+(a.days===1?" day":" days")+(best?" · "+best:"")), el("span","ext",tot)); ul.appendChild(li)});
 }
 
 function renderWeekList(mon,today){
@@ -493,7 +604,7 @@ function renderWeekList(mon,today){
     if(past){li.tabIndex=0; const o=()=>openDay(s); li.onclick=o; li.onkeydown=e=>{if(e.key==="Enter")o()}}
     ul.appendChild(li);
   }
-  $("dotLegend").textContent="Dots, in order: Coffee, Stretch, Dumbbells or Rope, Breakfast, Walk, Skin care.";
+  $("dotLegend").textContent="Dots, in order: Coffee, Stretch, Workout, Breakfast, Walk, Skin care.";
 }
 
 function renderMonth(first,today){
@@ -538,7 +649,7 @@ function renderProgress(today){
   $("streak").textContent=n+(n===1?" day":" days"); $("streakN").textContent=n;
   const tw=weekNo(today);
   $("phase").textContent= today<START ? "Plan starts "+fmt(START,{weekday:"long",month:"short",day:"numeric"})+"." :
-    "Week "+tw+" of the plan · jump rope: "+ropeText(tw)+".";
+    "Week "+tw+" of the plan.";
 }
 
 function renderInfo(){
@@ -549,7 +660,7 @@ function renderInfo(){
 }
 
 function openDay(s){sel=s;setView("day")}
-function setView(v){view=v;LS.set("view",v);walkOpen=false;render();window.scrollTo(0,0)}
+function setView(v){view=v;LS.set("view",v);walkOpen=false;workOpen=false;render();window.scrollTo(0,0)}
 
 /* ---------- toast ---------- */
 let toastTimer;
@@ -577,7 +688,7 @@ async function load(){
     if(dirty) await save(); else setSync("ok","Synced");
   }catch(e){ setSync("bad", e.message==="401"?"Token rejected":"Offline, saved on phone") }
 }
-function merge(a,b){const out={days:{}}; const keys=new Set([...Object.keys(a.days||{}),...Object.keys(b.days||{})]);
+function merge(a,b){const out={days:{},lib:Object.assign({},a.lib||{},b.lib||{})}; const keys=new Set([...Object.keys(a.days||{}),...Object.keys(b.days||{})]);
   keys.forEach(k=>{const x=(a.days||{})[k],y=(b.days||{})[k]; out.days[k]=!x?y:!y?x:((y.updated||"")>(x.updated||"")?y:x)}); return out}
 async function save(){
   if(!cfg||saving) return; saving=true;
@@ -593,7 +704,7 @@ async function save(){
 
 /* ---------- events ---------- */
 document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>setView(b.dataset.view));
-$("todayBtn").onclick=()=>{sel=iso(new Date());walkOpen=false;render()};
+$("todayBtn").onclick=()=>{sel=iso(new Date());walkOpen=false;workOpen=false;render()};
 function stepP(n){const t=iso(new Date()); sel= view==="week"?addDays(mondayOf(sel),7*n):addMonths(sel,n); if(sel>t) sel=t; render()}
 $("prevP").onclick=()=>stepP(-1); $("nextP").onclick=()=>stepP(1);
 $("pToday").onclick=()=>{sel=iso(new Date());render()};
@@ -617,7 +728,7 @@ $("connectBtn").onclick=async()=>{
 let tx=null,ty=null;
 $("main").addEventListener("touchstart",e=>{if(view!=="day"||e.target.closest("input,textarea,.strip")) {tx=null;return} tx=e.touches[0].clientX; ty=e.touches[0].clientY},{passive:true});
 $("main").addEventListener("touchend",e=>{if(tx==null) return; const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty; tx=null;
-  if(Math.abs(dx)>70&&Math.abs(dy)<45){const t=iso(new Date()); const n=dx<0?1:-1; const ns=addDays(sel,n); if(ns<=t){sel=ns;walkOpen=false;render()}}},{passive:true});
+  if(Math.abs(dx)>70&&Math.abs(dy)<45){const t=iso(new Date()); const n=dx<0?1:-1; const ns=addDays(sel,n); if(ns<=t){sel=ns;walkOpen=false;workOpen=false;render()}}},{passive:true});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){render(); load()}});
 window.addEventListener("online",()=>{if(dirty) save()});
 

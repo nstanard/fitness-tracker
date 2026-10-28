@@ -92,6 +92,8 @@ header>*{min-width:0}
 .item:first-child{border-top:0}
 .ihead{display:grid;grid-template-columns:48px 1fr auto;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
 .time{font:600 1rem var(--display);color:var(--muted);font-variant-numeric:tabular-nums}
+.time.soft{font:600 .78rem/1.15 var(--body);letter-spacing:.02em}
+.time.at{color:var(--accent)}
 .what{min-width:0}
 .what b{display:block;font-weight:600}
 .what small{color:var(--muted);display:block}
@@ -334,7 +336,7 @@ const ITEMS = [
   {k:"stretch",  g:"m", t:"6:00", n:"Stretch",          d:"10 min", days:ALL},
   {k:"workout",  g:"m", t:"6:15", n:"Workout",          d:"", days:ALL},
   {k:"breakfast",g:"m", t:"6:45", n:"Breakfast",        d:"Oatmeal, banana, protein", days:ALL},
-  {k:"walk",     g:"m", t:"8:00", n:"Walk",             d:"", days:ALL},
+  {k:"walk",     g:"m", t:"", n:"Walk",             d:"", days:ALL},
   {k:"feet",     g:"e", t:"8:00", n:"Skin care",        d:"", days:ALL},
 ];
 const NAMES={coffee:"Coffee",stretch:"Stretch",workout:"Workout",breakfast:"Breakfast",walk:"Walk",feet:"Skin care"};
@@ -462,7 +464,11 @@ function itemEl(i,d,w,isNext){
   if(i.k==="workout"){const wk=workOf(d); detail= wk.length? workSummary(wk) : (d.lift||d.rope)? "Logged (no details)" : "Tap to log exercises"}
   if(i.k==="walk") detail= wn ? (wt?wt+" min":"Done")+(wn>1?" in "+wn+" walks":"") : "Tap to log minutes";
   head.innerHTML='<span class="time"></span><span class="what"><b></b><small></small></span><span class="check" aria-hidden="true"></span>';
-  head.querySelector(".time").textContent=i.t;
+  const tm=head.querySelector(".time"), doneAt=isDone(i,d)&&(d.at||{})[i.k];
+  if(doneAt){tm.textContent=fmtHM(doneAt); tm.classList.add("soft","at"); tm.title="Done at "+fmtHM(doneAt)}
+  else if(!i.t){tm.textContent="Any time"; tm.classList.add("soft")}
+  else if(i.t.includes("–")){tm.textContent=i.t; tm.classList.add("soft")}
+  else tm.textContent=i.t;
   const bt=head.querySelector("b"); bt.textContent=i.n;
   if(i.k==="walk"||i.k==="workout"){const o=i.k==="walk"?walkOpen:workOpen; bt.appendChild(el("span","chev",o?"▲":"▼"))}
   if(isNext) bt.appendChild(el("span","nexttag","Up next"));
@@ -481,7 +487,7 @@ function itemEl(i,d,w,isNext){
     if(workOpen) li.appendChild(workLogger(d));
   } else {
     head.setAttribute("role","checkbox"); head.setAttribute("aria-checked",!!d[i.k]);
-    const t=()=>edit(sel,{[i.k]:!d[i.k]});
+    const t=()=>{const on=!d[i.k]; edit(sel,{[i.k]:on, at:stamp(i.k,on)})};
     head.onclick=t; head.onkeydown=e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();t()}};
     li.appendChild(head);
   }
@@ -494,7 +500,7 @@ function walkLogger(d){
   walksOf(d).forEach((m,ix)=>{
     const li=el("li"); li.appendChild(el("span",null,"Walk "+(ix+1)+" · "+(m?m+" min":"time not logged")));
     const rm=el("button",null,"Remove"); rm.setAttribute("aria-label","Remove walk "+(ix+1));
-    rm.onclick=()=>{const before=JSON.parse(JSON.stringify(day(sel))), s=sel; const a=walksOf(day(sel)).slice(); a.splice(ix,1); edit(sel,{walks:a,walk:a.length>0}); toast("Walk removed",()=>{data.days[s]=Object.assign(before,{updated:new Date().toISOString()}); commit()})};
+    rm.onclick=()=>{const before=JSON.parse(JSON.stringify(day(sel))), s=sel; const a=walksOf(day(sel)).slice(); a.splice(ix,1); edit(sel,{walks:a,walk:a.length>0,at:stamp("walk",a.length>0)}); toast("Walk removed",()=>{data.days[s]=Object.assign(before,{updated:new Date().toISOString()}); commit()})};
     li.appendChild(rm); ul.appendChild(li);
   });
   box.appendChild(ul);
@@ -515,7 +521,7 @@ function workLogger(d){
     const x=exDef(e.ex), li=el("li","exrow");
     const top=el("div","extop"); top.appendChild(el("b",null,x.n));
     const rm=el("button","exrm","Remove"); rm.setAttribute("aria-label","Remove "+x.n);
-    rm.onclick=()=>{const before=JSON.parse(JSON.stringify(day(sel))), s=sel; const a=workOf(day(sel)).slice(); a.splice(ix,1); edit(sel,{workout:a}); toast(x.n+" removed",()=>{data.days[s]=Object.assign(before,{updated:new Date().toISOString()}); commit()})};
+    rm.onclick=()=>{const before=JSON.parse(JSON.stringify(day(sel))), s=sel; const a=workOf(day(sel)).slice(); a.splice(ix,1); edit(sel,{workout:a,at:stamp("workout",a.length>0)}); toast(x.n+" removed",()=>{data.days[s]=Object.assign(before,{updated:new Date().toISOString()}); commit()})};
     top.appendChild(rm); li.appendChild(top);
     const f=el("div","exfields");
     if(x.type==="time"){ f.append(numIn(e.min,x.n+" minutes","4.5ch",v=>setEntry(ix,{min:v})), el("span","muted","min")) }
@@ -544,8 +550,11 @@ function addEx(keys){const a=workOf(day(sel)).slice(), w=weekNo(sel);
     const base=last?{sets:last.sets,reps:last.reps,lb:last.lb,sec:last.sec,min:last.min}:Object.assign({},x.def||{});
     if(k==="rope"&&!last){base.sets=w<=1?3:5; base.sec=w<=2?30:w===3?45:60}
     Object.keys(base).forEach(f=>{if(base[f]!=null) e[f]=base[f]}); a.push(e)});
-  edit(sel,{workout:a})}
-function addWalk(m){m=Math.round(m); if(!(m>0&&m<=600)) return; let a=walksOf(day(sel)).slice(); if(a.length===1&&a[0]===0) a=[]; a.push(m); edit(sel,{walks:a,walk:true})}
+  edit(sel,{workout:a,at:stamp("workout",true)})}
+function nowHM(){const n=new Date(); return String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0")}
+function stamp(k,on){const at=Object.assign({},day(sel).at||{}); if(on){ if(!at[k]&&sel===iso(new Date())) at[k]=nowHM() } else delete at[k]; return at}
+function fmtHM(hm){const [h,m]=hm.split(":").map(Number); return (h%12||12)+":"+String(m).padStart(2,"0")+(h<12?" am":" pm")}
+function addWalk(m){m=Math.round(m); if(!(m>0&&m<=600)) return; let a=walksOf(day(sel)).slice(); if(a.length===1&&a[0]===0) a=[]; a.push(m); edit(sel,{walks:a,walk:true,at:stamp("walk",true)})}
 function prevWeight(s){const ks=Object.keys(data.days).filter(k=>k<s&&data.days[k].weight).sort(); const k=ks[ks.length-1]; return k?{s:k,w:data.days[k].weight}:null}
 
 function renderPeriod(today){
